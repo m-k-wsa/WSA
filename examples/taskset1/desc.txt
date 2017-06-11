@@ -1,0 +1,4 @@
+This is a Rate Monotonic system, and its taskset
+has an almost 100% total utilization. Every 5 
+activations of the lowest priority task (\tau_6),
+at most one job will miss the deadline.
