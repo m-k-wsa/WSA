@@ -29,3 +29,6 @@ arbitrary sequence of K its activations.
     ++++++++++++
       6   |  15
     ++++++++++++
+
+To check the m-K for this system:
+./src/jitter-demo m K
