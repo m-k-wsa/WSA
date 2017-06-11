@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -13,17 +14,37 @@ using namespace std;
 
 static int seed = 123;
 
+//std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+//  std::stringstream ss(s);
+//  std::string item;
+//  while (std::getline(ss, item, delim)) {
+//    elems.push_back(item);
+//  }
+//  return elems;
+//}
+//
+//
+//std::vector<std::string> split(const std::string &s, char delim) {
+//  std::vector<std::string> elems;
+//  split(s, delim, elems);
+//  return elems;
+//}
 
-void simul(const int n, const int nSets, const string& fname, const int m, const int K) {
+//bool com_dline(const Task& a, const Task& b) {return a.get_dline() < b.get_dline();}
+
+void simul(const int n, const int nSets, const string& fname, const int m, const int K, const int lb, const int ub) {
 
   ifstream input(fname);
   int count = 0;
   int nsched = 0;
 
   while (count ++ < nSets) {
+    if(count>=ub) break; 
+
     vector<Task> tasks;
     string line;
 
+    bool valid=true;
     for ( int i = 0; i < n; i ++) {
       getline(input, line); // read a line from the input file
       stringstream linestream(line);
@@ -34,29 +55,32 @@ void simul(const int n, const int nSets, const string& fname, const int m, const
 
       double u;
       double c, p;
-      //u = atof(tokens[0].c_str());
-      //c = atof(tokens[1].c_str());
-      //p = atof(tokens[2].c_str());
-      c = atof(tokens[0].c_str());
-      p = atof(tokens[1].c_str());
+      u = atof(tokens[0].c_str());
+      c = atof(tokens[1].c_str());
+      p = atof(tokens[2].c_str());
 
+      if(c==0 or p==0) valid=false;
       Task t(c, c, p, p);
       tasks.push_back(t);
     }
     getline(input, line); // between two tasksets, there is a line of delimiter
     
+    if(count<lb) continue;
+
+    if(not valid) continue;
 
     //tasks_sorting(tasks);
     sort(tasks.begin(), tasks.end(), //com_dline);
         [](const Task& a, const Task& b) {return a.get_dline() < b.get_dline();}
     );
-    //for ( int x = 1; x <= n; x++) 
-    //  tasks[x-1].print();
+    std::cout << "\n----------------------\n"; 
+    for ( int x = 1; x <= n; x++) 
+      tasks[x-1].print();
 
 
     // schedulability analysis
     for ( int x = 1; x <= n; x++) {
-      //cout << "x: " << x << "\n ";
+      cout << "x: " << x << "\n ";
       vector<Task> hps;
       for ( int y = 1; y < x; y++) 
         hps.push_back( tasks[y-1]);
@@ -69,8 +93,9 @@ void simul(const int n, const int nSets, const string& fname, const int m, const
       //cout << "bcrt: " << tasks[x-1].get_bcrt() << "\n ";
       if (x < n) 
       {
-        if(tasks[x-1].wcrt<=tasks[x-1].dline) continue;
-        else break;
+        //if(tasks[x-1].wcrt<=tasks[x-1].dline) continue;
+        //else break;
+        continue;
       }
       if(tasks[x-1].wcrt<=tasks[x-1].dline) continue; //{ std::cout << "sched: " << count << std::endl; continue;}
       if(tasks[x-1].bcrt>tasks[x-1].dline) continue;
@@ -85,7 +110,8 @@ void simul(const int n, const int nSets, const string& fname, const int m, const
       cout << "----------*--------------" << endl;
 
       statWA swa = wanalysis(tasks[x-1], hps, m, K);
-      string fout(fname+"-res-"+to_string(m)+"-"+to_string(K));
+      string fout("results-last/"+fname+"-res-"+to_string(m)+"-"+to_string(K));
+      std::cout << "------> " << fout << "\n";
       ofstream fouts;
       fouts.open(fout, ios::app);
       fouts << "hps size: " << hps.size() << ", (m, K) " << m << ", " << K << ", bounded = " << swa.bounded << ", time = " << swa.time << ", R=" << tasks[x-1].wcrt << ", bp=" << tasks[x-1].bp << endl;
@@ -100,13 +126,12 @@ void simul(const int n, const int nSets, const string& fname, const int m, const
       fouts << swa.time << std::endl;
       fouts.close();
 
-      if( nsched == 100) return;
+      if( nsched == 1000) return;
     }
 
   }
 
 }
-
 
 //void simul(const int n, const int m, const int nSets, const string& fname) {
 //

@@ -18,12 +18,15 @@ class Task : public HasUniqueId<Task> {
     double wcrt, bcrt;
     double bp;
     double end_r;
+    double jitter;
+    double period_lb, period_ub;
 
 
     Task ();
     Task (const double c, const double d, const double p); 
     Task (const double c_lb, const double c_ub, const double d, const double p);
     Task (const Task& t);
+    Task (const double jitter, const double c_lb, const double c_ub, const double d, const double p_min, const double p_max);
 
 
     void set_wcet(const double w) { wcet = w;}

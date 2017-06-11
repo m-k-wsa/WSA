@@ -15,7 +15,7 @@ void showhelpinfo(char *s)
 {
   cout<<"Usage:   "<<s<<" [-option] [argument]"<<endl;
   cout<<"option:  "<<"-h  show help information"<<endl;
-  cout<<"         "<<"-n number of tasks"<<endl;
+  cout<<"         "<<"-n  number of tasks"<<endl;
   cout<<"         "<<"-m  the m parameter"<<endl;
   cout<<"         "<<"-k  the K parameter"<<endl;
   cout<<"         "<<"-f  the file containing input tasks in the form of (C, D, T)"<<endl;

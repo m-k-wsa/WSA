@@ -24,18 +24,22 @@ std::string  convert_to_string(const int Number) {
 statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, const int K) {
 
   cout << "Weakly hard real-time analysis of a task ti" << endl;
-  double ci = ti.get_wcet(), di = ti.get_dline(), pi = ti.get_period(), Ri = ti.get_wcrt(), bri=ti.get_bcrt();
-  double BP = ti.get_bp(); int Ni = ceil(BP / pi);
-  double ui = ci / pi;
+  double ci = ti.get_wcet(), di = ti.get_dline(), pi_min = ti.period_lb, pi_max=ti.period_ub, Ri = ti.get_wcrt(), bri=ti.get_bcrt();
+  double BP = ti.get_bp(); int Ni = ceil(BP / pi_max);
+  //double ui = ci / pi;
   
   // the vector of wcet, dline, period and utilization of each higher priority task
-  vector<double> c, d, p, u, br;
+  vector<double> c, d, p, u, br, jitter;
   for ( int j = 1; j <= hps.size(); j++) {
     double cj = hps[j-1].get_wcet(), dj = hps[j-1].get_dline(), pj = hps[j-1].get_period();
+    double jj=hps[j-1].jitter;
     double brj=hps[j-1].get_bcrt();
     c.push_back(cj); d.push_back(dj); p.push_back(pj); u.push_back(cj/pj);
     br.push_back(brj);
+    jitter.push_back(jj);
   }
+  for (auto &jj : jitter)
+    std::cout << "jitter: " << jj << "\n";
   //double totU = ui;
   //for ( int j = 1; j <= hps.size(); j++)
   //  totU += c[j-1]/p[j-1];
@@ -45,7 +49,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
   copy_hps.push_back(ti);
   vector<double> idle_lb; // minimum level-i idle time w.r.c time lengths of pi, 2*pi, 3*pi, ..., K*pi
   for ( int i = 1; i <= K; i++) {
-    idle_lb.push_back( fmax(0, computeIdle(copy_hps, i*pi)));
+    idle_lb.push_back( fmax(0, computeIdle(copy_hps, i*pi_min)));
     cout << idle_lb[i-1] << endl;
   }
 
@@ -71,19 +75,21 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
 
     /*********************** VARIABLES **********************************/
 
+    // the period is a constant in between 'pi_min' and 'pi_max'
+    IloNumVar pi(env, pi_min, pi_max, ILOFLOAT, "period");
 
     // (a) Busy windows <C>
     IloNumVarArray L(env, 0, 0, IloInfinity, ILOFLOAT);
     for ( int k = 1; k <= K ;k++) {
       string name_bp = "bp" + convert_to_string(k);
-      L.add(IloNumVar(env, 0, pi-bri, ILOFLOAT, name_bp.c_str())); // [1]
+      L.add(IloNumVar(env, 0, pi_max-bri, ILOFLOAT, name_bp.c_str())); // [1]
+      model.add(IloRange(env, -IloInfinity, L[k-1]-pi, -bri)); // **jitter
     }
-
-    // (b) offsets <C>
+    // (b) offsets <C> ***
     IloNumVarArray alpha(env, 0, 0, IloInfinity, ILOFLOAT);
     for ( int j = 1; j <= hps.size() ;j++) {
       string name_alpha = "alpha" + convert_to_string(j);
-      alpha.add(IloNumVar(env, 0, p[j-1]-br[j-1], ILOFLOAT, name_alpha.c_str())); //[2]
+      alpha.add(IloNumVar(env, 0, p[j-1]-br[j-1]+jitter[j-1], ILOFLOAT, name_alpha.c_str())); //[2]
     }
 
     // (c) finish times <C>
@@ -95,14 +101,19 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
       IloExpr rk(env); rk += L[0] + (k-1)*pi;
       model.add(IloRange(env, bri, f[k-1]-rk, Ri)); // [3]
       if (k > 1)
-        model.add(IloRange(env, ci, f[k-1]-f[k-2], Ri+pi-bri)); // [4]
+      {
+        //model.add(IloRange(env, ci, f[k-1]-f[k-2], Ri+pi-bri)); // [4]
+        model.add(IloRange(env, ci, f[k-1]-f[k-2], IloInfinity)); // [4]
+        model.add(IloRange(env, -IloInfinity, f[k-1]-f[k-2]-pi, Ri-bri)); // [4]
+      }
     }
 
     // (d) idle times <C>
     IloNumVarArray idle(env, 0, 0, IloInfinity, ILOFLOAT);
     for ( int k = 1; k <= K ;k++) {
       string name_idle = "idle" + convert_to_string(k);
-      idle.add(IloNumVar(env, 0, pi-bri, ILOFLOAT, name_idle.c_str())); // [5]
+      idle.add(IloNumVar(env, 0, pi_max-bri, ILOFLOAT, name_idle.c_str())); // [5]
+      model.add(IloRange(env, -IloInfinity, idle[k-1]-pi, -bri)); // ***jitter
     }
 
     // (e) schedulability <B> 
@@ -112,7 +123,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
       string name = "b" + convert_to_string(k);
       b.add(IloNumVar(env, 0, 1, ILOBOOL, name.c_str()));
 
-      IloExpr dk(env); dk += L[0] + (k-1)*pi + di;
+      IloExpr dk(env); dk += L[0] + (k-1)*pi + pi; //di;
       model.add (IloRange(env, 0, M*b[k-1] + dk - f[k-1], IloInfinity)); // [6.l]
       model.add (IloRange(env, -IloInfinity, dk-f[k-1] + sigma - M*(1-b[k-1]), 0)); // [6.r]
     }
@@ -153,23 +164,23 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     for ( int j = 1; j <= hps.size(); j++) {
       for ( int k = 1; k <= K; k++) {
         //// a coarse upper bound (uf) [Ex]
-        model.add ( IloRange(env,     -IloInfinity,     nf[j-1][k-1] - ceil( (pi-bri+(k-1)*pi+Ri)/p[j-1]),             0) );
+        model.add ( IloRange(env,     -IloInfinity,     nf[j-1][k-1] - ceil( (pi_max-bri+(k-1)*pi_max+Ri+jitter[j-1])/p[j-1]),             0) ); //*** jitter
 
         //// nf [10]
-        model.add ( IloRange(env,     0,                nf[j-1][k-1] - (f[k-1] - alpha[j-1])/p[j-1],              IloInfinity) );
-        model.add ( IloRange(env,     -IloInfinity,     nf[j-1][k-1] + sigma - (f[k-1] - alpha[j-1])/p[j-1] - 1,  0) );
+        model.add ( IloRange(env,     0,                nf[j-1][k-1] - (f[k-1] - alpha[j-1]-jitter[j-1])/p[j-1],              IloInfinity) );
+        model.add ( IloRange(env,     -IloInfinity,     nf[j-1][k-1] + sigma - (f[k-1] - alpha[j-1]+jitter[j-1])/p[j-1] - 1,  0) ); //****jitter
 
 
         if (k > 1) {
           //// a coarse upper bound (uf) [Ex]
           //model.add ( IloRange(env,     -IloInfinity,     nL[j-1][k-1] - ceil( (pi-bri+(k-1)*pi)/p[j-1]) - bb[k-2]*M,             0) );
-          model.add ( IloRange(env,     -IloInfinity,     nL[j-1][k-1] - ceil( (pi-bri+(k-1)*pi)/p[j-1]) - b[k-2]*M,             0) );
+          model.add ( IloRange(env,     -IloInfinity,     nL[j-1][k-1] - ceil( (pi_max-bri+(k-1)*pi_max+jitter[j-1])/p[j-1]) - b[k-2]*M,             0) ); //***jitter
 
           //// nL [11]
           //model.add ( IloRange(env,     0,             bb[k-2]*M + nL[j-1][k-1] - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1])/p[j-1],   IloInfinity) );
           //model.add ( IloRange(env,     -IloInfinity,  -bb[k-2]*M + nL[j-1][k-1] + sigma - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1])/p[j-1] - 1,             0) );
-          model.add ( IloRange(env,     0,             b[k-2]*M + nL[j-1][k-1] - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1])/p[j-1],   IloInfinity) );
-          model.add ( IloRange(env,     -IloInfinity,  -b[k-2]*M + nL[j-1][k-1] + sigma - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1])/p[j-1] - 1,             0) );
+          model.add ( IloRange(env,     0,             b[k-2]*M + nL[j-1][k-1] - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1]-jitter[j-1])/p[j-1],   IloInfinity) );
+          model.add ( IloRange(env,     -IloInfinity,  -b[k-2]*M + nL[j-1][k-1] + sigma - (L[0]+(k-1)*pi - L[k-1] - alpha[j-1]+jitter[j-1])/p[j-1] - 1,             0) ); //***jitter
         }
         else { // [12]
           model.add ( IloRange(env,     0,     nL[j-1][k-1],   0) );
@@ -197,14 +208,14 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     vector< std::vector<IloNumVarArray> > nfb;
     //double ub=fmin( Ri, BP-ci);
     //double ubf=Ri;
-    double ubf=Ri+pi-bri;
+    double ubf=Ri+pi_max-bri;//***jitter
     //double ub=fmin( Ri+pi-ci, BP-ci);
     for ( int j = 1; j <= hps.size(); j++) {
       vector<IloNumVarArray> v;
       for ( int k = 1; k <= K; k++) {
         IloNumVarArray vv(env, 0, 0, 1, ILOBOOL);
         //for ( int i = 1; i <= ceil(Ri/p[j-1]); i++) {
-        for ( int i = 1; i <= ceil(ubf/p[j-1]); i++) {
+        for ( int i = 1; i <= ceil((ubf+jitter[j-1])/p[j-1]); i++) {
           string name = "nfb_" + convert_to_string(k) + "_" + convert_to_string(j) + "_" + convert_to_string(i);
           vv.add(IloNumVar(env, 0, 1, ILOBOOL, name.c_str()));
         }
@@ -217,7 +228,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
       for ( int k = 1; k <= K; k++) {
         IloExpr Delta(env);
         //for ( int i = 1; i <= ceil(Ri/p[j-1]); i++)
-        for ( int i = 1; i <= ceil(ubf/p[j-1]); i++)
+        for ( int i = 1; i <= ceil((ubf+jitter[j-1])/p[j-1]); i++)
           Delta += nfb[j-1][k-1][i-1];
         model.add(IloRange( env, 0, nL[j-1][k-1] + Delta - nf[j-1][k-1], 0));
       }
@@ -226,7 +237,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     for ( int j = 1; j <= hps.size(); j++) {
       for ( int k = 1; k <= K; k++) {
         //for ( int i = 1; i <= ceil(Ri/p[j-1]); i++) {
-        for ( int i = 1; i <= ceil(ubf/p[j-1]); i++) {
+        for ( int i = 1; i <= ceil((ubf+jitter[j-1])/p[j-1]); i++) {
           if ( i > 1)
             model.add( IloRange(env, 0, nfb[j-1][k-1][i-1]-nfb[j-1][k-1][i-2], 1));
         }
@@ -239,7 +250,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
       vector<IloNumVarArray> v;
       for ( int k = 1; k <= K; k++) {
         IloNumVarArray vv(env, 0, 0, 1, ILOBOOL);
-        for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++) {
+        for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++) { //***jitter
           string name = "nLb_" + convert_to_string(k) + "_" + convert_to_string(j) + "_" + convert_to_string(i);
           vv.add(IloNumVar(env, 0, 1, ILOBOOL, name.c_str()));
         }
@@ -251,7 +262,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     for ( int j = 1; j <= hps.size(); j++) {
       for ( int k = 2; k <= K; k++) {
         IloExpr Delta_p(env);
-        for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++)
+        for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++) //**jitter
           Delta_p += nLb[j-1][k-1][i-1];
         model.add(IloRange( env, 0, nf[j-1][k-2] + Delta_p - nL[j-1][k-1] + b[k-2]*M, IloInfinity));
         model.add(IloRange( env, -IloInfinity, nf[j-1][k-2] + Delta_p - nL[j-1][k-1] - b[k-2]*M, 0));
@@ -260,7 +271,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     ////// if bb[k-2] == 1, nLb == 0 // [17]
     for ( int j = 1; j <= hps.size(); j++) {
       for ( int k = 2; k <= K; k++) {
-        for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++) {
+        for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++) { //***jitter
           model.add(IloRange( env, 0, nLb[j-1][k-1][i-1] + (1-b[k-2])*M, IloInfinity));
           model.add(IloRange( env, -IloInfinity, nLb[j-1][k-1][i-1] - (1-b[k-2])*M, 0));
         }
@@ -269,7 +280,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     ////// nLb[j][k][i] >= nLb[j][k][i-1] // [18]
     for ( int j = 1; j <= hps.size(); j++) {
       for ( int k = 1; k <= K; k++) {
-        for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++) {
+        for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++) { //***jitter
           if ( i > 1)
             model.add( IloRange(env, 0, nLb[j-1][k-1][i-1]-nLb[j-1][k-1][i-2], 1));
         }
@@ -281,12 +292,12 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
       for ( int k = 1; k <= K; k++) {
 
         if ( k > 1) {
-          for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++)
+          for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++)//***jitter
             totN += nLb[j-1][k-1][i-1];
         }
 
         //for ( int i = 1; i <= ceil(Ri/p[j-1]); i++)
-        for ( int i = 1; i <= ceil(ubf/p[j-1]); i++)
+        for ( int i = 1; i <= ceil((ubf+jitter[j-1])/p[j-1]); i++)
           totN += nfb[j-1][k-1][i-1];
         
         model.add( IloRange(env, 0, totN - nf[j-1][k-1], 0));
@@ -295,7 +306,7 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     }
     ////// nLb_j_1_p = 0 [Ex]
     for ( int j = 1; j <= hps.size(); j++) {
-      for ( int i = 1; i <= ceil((pi-bri)/p[j-1]); i++) {
+      for ( int i = 1; i <= ceil((pi_max-bri+jitter[j-1])/p[j-1]); i++) { //**jitter
         model.add( IloRange(env, 0, nLb[j-1][0][i-1], 0));
       }
     }
@@ -442,8 +453,8 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
     //// Extracting the model
     IloCplex cplex(env);
 
-    //const int timeLimit = 60*30;
-    const int timeLimit = 7200; //60*30*4;
+    const int timeLimit = 60*30;
+    //const int timeLimit = 7200; //60*30*4;
     cplex.setParam(IloCplex::TiLim,timeLimit);
     //cplex.setParam(IloCplex::TreLim,1024);
 
@@ -483,4 +494,3 @@ statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, cons
 
 
 }
-

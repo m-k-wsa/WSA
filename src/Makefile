@@ -9,8 +9,8 @@ LIBFORMAT  = static_pic
 #
 #------------------------------------------------------------
 
-CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio1263/cplex
-CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio1263/concert
+CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio127/cplex
+CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio127/concert
 # ---------------------------------------------------------------------
 # Compiler selection 
 # ---------------------------------------------------------------------
@@ -82,15 +82,15 @@ clean :
 # The examples
 #
 
-all : wsa
+all : main
 
-wsa: wsa.o task.o wa.o exp.o util.o
-	$(CCC) $(CCFLAGS) $(CCLNDIRS) -o wsa task.o wa.o exp.o wsa.o util.o $(CCLNFLAGS)
+main: main.o task.o wa.o exp.o util.o
+	$(CCC) $(CCFLAGS) $(CCLNDIRS) -o main task.o wa.o exp.o main.o util.o $(CCLNFLAGS)
 
-wsa.o: task.hpp wa.hpp 
-	$(CCC) -c $(CCFLAGS) wsa.cpp -o wsa.o
+main.o: task.hpp wa.hpp
+	$(CCC) -c $(CCFLAGS) main.cpp -o main.o
 
-task.o : task.cpp util.hpp
+task.o : task.hpp util.hpp
 	$(CCC) -c $(CCFLAGS) task.cpp -o task.o
 
 wa.o : wa.hpp
@@ -99,9 +99,9 @@ wa.o : wa.hpp
 exp.o : exp.hpp util.hpp
 	$(CCC) -c $(CCFLAGS) exp.cpp -o exp.o
 
+
 util.o : util.hpp
 	$(CCC) -c $(CCFLAGS) util.cpp -o util.o
-
 
 
 #blend: blend.o
