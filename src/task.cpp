@@ -48,34 +48,29 @@ Task::Task (const double c, const double d, const double p)
 Task::Task (const double c_lb, const double c_ub, const double d, const double p)
   : bcet(c_lb), wcet(c_ub), dline(d), period(p), wcrt(numeric_limits<double>::max()), bcrt(numeric_limits<double>::min()) {}
 
-Task::Task (const double J,
-            const double c_lb,
-            const double c_ub,
-            const double d,
-            const double p_min,
-            const double p_max)
-  : 
-  jitter(J), 
-  bcet(c_lb), 
-  wcet(c_ub),
-  dline(d),
-  period_lb(p_min),
-  period_ub(p_max),
-  wcrt(numeric_limits<double>::max()), bcrt(numeric_limits<double>::min()) {
-    period=period_lb; // this is hacking
-  }
-
 
 Task::Task (const Task& t) 
-  : HasUniqueId<Task>(t), wcet(t.wcet), dline(t.dline), period(t.period), wcrt(t.wcrt), bcrt(t.bcrt), bcet(t.bcet) {
-  jitter=t.jitter;
-  period_lb=t.period_lb;
-  period_ub=t.period_ub;
+  : HasUniqueId<Task>(t), wcet(t.wcet), dline(t.dline), period(t.period), wcrt(t.wcrt), bcrt(t.bcrt), bcet(t.bcet), cs(t.cs) {
+      for(auto it=t.CS.begin(); it !=t.CS.end(); it++)
+        std::cout << "--- CS: " << it->second.size() << std::endl;
+    for(auto &x:t.CS)
+    {
+      CS[x.first]=x.second;
+    }
+      for(auto it=CS.begin(); it !=CS.end(); it++)
+        std::cout << "+++ CS: " << it->second.size() << std::endl;
   }
 
 void Task::print() const {
   cout << "task id: " << get_id() << ", (" << bcet << ", " << wcet << ", " << get_dline() << ", " << period << ") ";
-  cout << "wcrt = " << wcrt << ", bcrt = " << bcrt;
+  cout << "wcrt = " << wcrt << ", bcrt = " << bcrt << ", cs = " << cs << std::endl;
+  for(auto it = CS.begin(); it != CS.end(); it++)
+  {
+    std::cout << "res " << it->first << ": ";
+    for(auto &x: it->second)
+      std::cout << x << " " ;
+    std::cout << "\n" ;
+  }
   cout << endl;
 }
 
@@ -118,9 +113,9 @@ void compute_wcrt(Task& tk, const vector<Task>& hps) {
   int k = 0; bool flag = true;
   while ( flag) {
     k++;
-    double X = k * c;
+    double X = k * c+tk.cs;
     while ( true) {
-      double I = k*c;
+      double I = k*c+tk.cs;
       for ( int i = 0; i < hps.size(); i++)
       {
         //cout << "I: " << I << std::endl;
@@ -131,7 +126,7 @@ void compute_wcrt(Task& tk, const vector<Task>& hps) {
         //cout << "wcet: " << hps[i].get_wcet() << endl;
 
         //cout << ceil(X*1.0/hps[i].get_period()) * hps[i].get_wcet() << endl;;
-        I += ceil((hps[i].jitter+X*1.0)/hps[i].get_period()) * hps[i].get_wcet();
+        I += ceil(X*1.0/hps[i].get_period()) * hps[i].get_wcet();
       }
 
       if ( I > X) X = I;
@@ -176,8 +171,8 @@ void compute_bp(Task& tk, const vector<Task>& hps) {
     double X = 0;
     
     for ( int i = 0; i < hps.size(); i++)
-      X += ceil((hps[i].jitter+bp*1.0)/hps[i].get_period()) * hps[i].get_wcet();
-    X += ceil(bp*1.0/p) * c;
+      X += ceil(bp*1.0/hps[i].get_period()) * hps[i].get_wcet();
+    X += ceil(bp*1.0/p) * c + tk.cs;
 
     if( X == bp) {
       break;

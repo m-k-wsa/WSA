@@ -15,5 +15,8 @@ void hello_cplex();
 
 //int wanalysis(const Task& ti, const int K, const std::vector<Task>& hps);
 statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, const int K);
+statWA wanalysis(const Task& ti, const std::vector<Task>& hps, const int m, const int K, 
+  const std::vector<Task>& lps, 
+  const int nRes);
 
 #endif

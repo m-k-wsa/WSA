@@ -109,8 +109,8 @@ void simul(const int n, const int nSets, const string& fname, const int m, const
       std::cout << "wcet = " << tasks[x-1].wcet << ", bcrt = " << tasks[x-1].get_bcrt() << ", wcrt = " << tasks[x-1].get_wcrt() << ", dline= " << tasks[x-1].get_dline() << ", bp=" << tasks[x-1].get_bp() << std::endl;
       cout << "----------*--------------" << endl;
 
-      statWA swa = wanalysis(tasks[x-1], hps, m, K);
-      string fout("results-last/"+fname+"-res-"+to_string(m)+"-"+to_string(K));
+      statWA swa; // = wanalysis(tasks[x-1], hps, m, K);
+      string fout("results/"+fname+"-res-"+to_string(m)+"-"+to_string(K));
       std::cout << "------> " << fout << "\n";
       ofstream fouts;
       fouts.open(fout, ios::app);

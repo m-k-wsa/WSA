@@ -2,6 +2,7 @@
 #define __TASK_HPP__
 
 #include <string>
+#include <map>
 #include <vector>
 
 #include "has_unique_id.hpp"
@@ -14,19 +15,19 @@ class Task : public HasUniqueId<Task> {
 
   public:
 
+    std::map<int, std::vector<double> > CS;
+
     double wcet, bcet, dline, period;
     double wcrt, bcrt;
     double bp;
     double end_r;
-    double jitter;
-    double period_lb, period_ub;
+    double cs;
 
 
     Task ();
     Task (const double c, const double d, const double p); 
     Task (const double c_lb, const double c_ub, const double d, const double p);
     Task (const Task& t);
-    Task (const double jitter, const double c_lb, const double c_ub, const double d, const double p_min, const double p_max);
 
 
     void set_wcet(const double w) { wcet = w;}
