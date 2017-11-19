@@ -45,6 +45,7 @@ option:  -h  show help information
          -m  the m parameter
          -k  the K parameter
          -f  the file containing input tasks in the form of (C, D, T)
+         -x  kill the deadline-miss job
 
 Example
 ========
