@@ -9,8 +9,8 @@ LIBFORMAT  = static_pic
 #
 #------------------------------------------------------------
 
-CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio1263/cplex
-CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio1263/concert
+CPLEXDIR      = /opt/ibm/ILOG/CPLEX_Studio1271/cplex
+CONCERTDIR    = /opt/ibm/ILOG/CPLEX_Studio1271/concert
 # ---------------------------------------------------------------------
 # Compiler selection 
 # ---------------------------------------------------------------------
@@ -84,17 +84,21 @@ clean :
 
 all : wsa
 
-wsa: wsa.o task.o wa.o exp.o util.o
-	$(CCC) $(CCFLAGS) $(CCLNDIRS) -o wsa task.o wa.o exp.o wsa.o util.o $(CCLNFLAGS)
+wsa: wsa.o task.o wa.o wa_kill.o exp.o util.o
+	$(CCC) $(CCFLAGS) $(CCLNDIRS) -o wsa task.o wa.o wa_kill.o exp.o wsa.o util.o $(CCLNFLAGS)
 
 wsa.o: task.hpp wa.hpp 
 	$(CCC) -c $(CCFLAGS) wsa.cpp -o wsa.o
+
 
 task.o : task.cpp util.hpp
 	$(CCC) -c $(CCFLAGS) task.cpp -o task.o
 
 wa.o : wa.hpp
 	$(CCC) -c $(CCFLAGS) wa.cpp -o wa.o
+
+wa_kill.o: wa.hpp 
+	$(CCC) -c $(CCFLAGS) wa_kill.cpp -o wa_kill.o
 
 exp.o : exp.hpp util.hpp
 	$(CCC) -c $(CCFLAGS) exp.cpp -o exp.o
